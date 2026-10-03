@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full bg-[#070d19] text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>FreshPantry - MHD & Food Tracker</title>
+
+  <!-- PWA & Mobile Web App Meta Tags -->
+  <meta name="theme-color" content="#070d19">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FreshPantry">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- EMBEDDED PWA MANIFEST -->
+  <script>
+    const manifest = {
+      "name": "FreshPantry - Food Tracker",
+      "short_name": "FreshPantry",
+      "description": "MHD & Lebensmittel-Tracker für dein Smartphone",
+      "start_url": "./",
+      "display": "standalone",
+      "background_color": "#070d19",
+      "theme_color": "#070d19",
+      "orientation": "portrait",
+      "icons": [
+        {
+          "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%23070d19'/><circle cx='256' cy='256' r='180' fill='%2300e5ff' opacity='0.2'/><path d='M256 120c-70 0-120 50-120 120 0 80 120 200 120 200s120-120 120-200c0-70-50-120-120-120z' fill='%2300e5ff'/></svg>",
+          "sizes": "512x512",
+          "type": "image/svg+xml",
+          "purpose": "any maskable"
+        }
+      ]
+    };
+    const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+    const manifestURL = URL.createObjectURL(manifestBlob);
+    const link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = manifestURL;
+    document.head.appendChild(link);
+  </script>
+
+  <style>
+    body {
+      background-color: #070d19;
+      color: #e2e8f0;
+      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: pan-y;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    ::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .swipe-container { position: relative; overflow: hidden; border-radius: 1rem; touch-action: pan-y; }
+    .swipe-bg-delete { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(239, 68, 68, 0.9) 0%, rgba(225, 29, 72, 0.95) 100%); display: flex; align-items: center; justify-content: space-between; padding: 0 1.25rem; color: white; font-weight: 700; font-size: 0.85rem; border-radius: 1rem; }
+    .swipe-card { position: relative; z-index: 2; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); will-change: transform; background-color: #0f192e; }
+    .swipe-card.swiping { transition: none !important; }
+    .safe-area-bottom { padding-bottom: max(env(safe-area-inset-bottom), 16px); }
+  </style>
+</head>
+
+<body class="h-full flex flex-col overflow-hidden text-slate-100 bg-[#070d19]">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-30 bg-[#070d19]/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 shrink-0">
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2.5">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/20">
+          <i class="fa-solid fa-basket-shopping text-lg"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-base leading-tight text-white flex items-center gap-1.5">
+            FreshPantry
+          </h1>
+          <p id="sub-counter" class="text-[11px] text-slate-400">Vorräte laden...</p>
+        </div>
+      </div>
+      
+      <!-- Dynamische Haushalts-Auswahl & Verwaltung -->
+      <div class="flex items-center gap-1.5">
+        <select id="householdSelect" class="bg-slate-800 border border-slate-600 text-xs text-white font-bold rounded-xl px-2.5 py-2 focus:outline-none focus:border-cyan-500 shadow-md max-w-[130px] truncate">
+          <!-- Dynamisch befüllt -->
+        </select>
+        <button id="addHouseholdBtn" title="Neuen Ort erstellen" class="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center hover:bg-cyan-500/30 transition-all">
+          <i class="fa-solid fa-plus text-xs"></i>
+        </button>
+        <button id="deleteHouseholdBtn" title="Aktuellen Ort löschen" class="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center hover:bg-rose-500/20 transition-all">
+          <i class="fa-solid fa-trash-can text-xs"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Sorting Selector -->
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-xs text-slate-400 font-medium">Sortierung:</span>
+      <select id="sortSelect" class="bg-slate-900 border border-slate-700/80 text-xs text-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-cyan-500">
+        <option value="expiry">MHD (Dringend)</option>
+        <option value="opened">Geöffnet am längsten</option>
+        <option value="name">Name (A-Z)</option>
+        <option value="fill">Füllstand</option>
+      </select>
+    </div>
+  </header>
+
+  <!-- Category Tabs -->
+  <div class="px-4 py-2.5 flex gap-2 overflow-x-auto no-scrollbar border-b border-slate-800/60 bg-[#070d19]/80 shrink-0">
+    <button id="tab-all" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-cyan-500 text-slate-950 shadow-md whitespace-nowrap transition-all">Alle Vorräte</button>
+    <button id="tab-expiring" class="px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 text-slate-300 border border-slate-800 whitespace-nowrap transition-all flex items-center gap-1">
+      <i class="fa-solid fa-clock text-amber-400"></i>
+      <span>Bald ablaufend</span>
+    </button>
+    <button id="tab-opened" class="px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 text-slate-300 border border-slate-800 whitespace-nowrap transition-all flex items-center gap-1">
+      <i class="fa-solid fa-box-open text-indigo-400"></i>
+      <span>Geöffnet</span>
+    </button>
+    <button id="tab-Kühlschrank" class="px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 text-slate-300 border border-slate-800 whitespace-nowrap transition-all flex items-center gap-1">
+      <i class="fa-solid fa-snowflake text-cyan-400"></i>
+      <span>Kühlschrank</span>
+    </button>
+    <button id="tab-Schrank" class="px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 text-slate-300 border border-slate-800 whitespace-nowrap transition-all flex items-center gap-1">
+      <i class="fa-solid fa-box-archive text-amber-400"></i>
+      <span>Schrank</span>
+    </button>
+    <button id="tab-Gefrierfach" class="px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 text-slate-300 border border-slate-800 whitespace-nowrap transition-all flex items-center gap-1">
+      <i class="fa-solid fa-icicles text-blue-400"></i>
+      <span>Gefrierfach</span>
+    </button>
+  </div>
+
+  <!-- Main Scrollable Items List -->
+  <main class="flex-1 overflow-y-auto p-4 space-y-3 max-w-lg mx-auto w-full pb-28" id="itemList">
+    <!-- Dynamic Items -->
+  </main>
+
+  <!-- Undo Toast Notification -->
+  <div id="undoToast" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 border border-cyan-500/40 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 transition-all duration-300 transform translate-y-20 opacity-0 pointer-events-none backdrop-blur-md">
+    <i class="fa-solid fa-trash-can text-rose-400 text-sm"></i>
+    <span id="toastText" class="text-xs text-slate-200">Produkt gelöscht</span>
+    <button id="undoBtn" class="bg-cyan-400 text-slate-950 px-3 py-1 rounded-xl text-xs font-bold hover:bg-cyan-300 transition-colors">
+      Rückgängig
+    </button>
+  </div>
+
+  <!-- Floating Action Button (FAB) -->
+  <button id="openModalBtn" class="fixed right-5 bottom-8 z-40 w-14 h-14 bg-gradient-to-tr from-cyan-400 to-blue-500 text-slate-950 rounded-2xl flex items-center justify-center text-2xl shadow-xl shadow-cyan-500/30 active:scale-95 transition-all border border-cyan-300/40">
+    <i class="fa-solid fa-plus text-slate-950"></i>
+  </button>
+
+  <!-- Add Item Modal -->
+  <div id="itemModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-[#0f192e] border border-slate-800 w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+      
+      <!-- Modal Header -->
+      <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-[#0f192e]">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+            <i class="fa-solid fa-plus text-sm"></i>
+          </div>
+          <h3 class="font-bold text-base text-slate-100">Neues Lebensmittel</h3>
+        </div>
+        <button id="closeModalBtn" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-4 overflow-y-auto space-y-4 text-sm flex-1">
+        <!-- Anzeige des aktuellen Haushalts -->
+        <div class="bg-cyan-900/30 border border-cyan-500/30 rounded-xl p-3 flex items-center gap-3">
+          <i class="fa-solid fa-house text-cyan-400"></i>
+          <span class="text-xs text-slate-200">Wird hinzugefügt zu: <strong id="modalHouseholdText" class="text-cyan-400">Mein Zuhause</strong></span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1.5">Produkt-Foto (Kamera / Galerie)</label>
+          <div class="flex items-center gap-3">
+            <div id="photoPreviewContainer" class="w-16 h-16 rounded-2xl bg-slate-950 border border-dashed border-slate-800 flex items-center justify-center overflow-hidden shrink-0">
+              <img id="photoPreview" class="hidden w-full h-full object-cover">
+              <i id="photoIcon" class="fa-solid fa-camera text-slate-600 text-lg"></i>
+            </div>
+            <div class="flex-1 space-y-1.5">
+              <label class="block w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-cyan-400 font-medium py-2.5 px-3 rounded-xl cursor-pointer text-center transition-all">
+                <i class="fa-solid fa-camera mr-1"></i> Foto aufnehmen / wählen
+                <input type="file" id="itemImage" accept="image/*" capture="environment" class="hidden">
+              </label>
+              <p class="text-[10px] text-slate-400">Bilder werden automatisch komprimiert.</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Produktname *</label>
+          <input type="text" id="itemName" placeholder="z. B. Vollmilch, Gouda, Brot" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Aufbewahrungsort</label>
+            <select id="itemLocation" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500">
+              <option value="Kühlschrank">❄️ Kühlschrank</option>
+              <option value="Schrank">📦 Vorratsschrank</option>
+              <option value="Gefrierfach">🧊 Gefrierfach</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">MHD Ablaufdatum *</label>
+            <input type="date" id="itemExpiry" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500">
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-slate-800 flex gap-3 safe-area-bottom bg-[#0f192e]">
+        <button id="cancelModalBtn" class="w-1/3 py-2.5 bg-slate-800 text-slate-300 font-semibold rounded-xl text-xs">Abbrechen</button>
+        <button id="saveItemBtn" class="w-2/3 py-2.5 bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-bold rounded-xl text-xs shadow-lg shadow-cyan-500/20">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase & Application Script -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyAOealN0NxXodpTQyJzmodqYePfwytUEWI",
+      authDomain: "freshpentry.firebaseapp.com",
+      projectId: "freshpentry",
+      storageBucket: "freshpentry.firebasestorage.app",
+      messagingSenderId: "534184294126",
+      appId: "1:534184294126:web:2bda132c0fcc4ff09c25ff",
+      measurementId: "G-GJ7CJKKTQT"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const pantryRef = collection(db, "pantry");
+
+    let items = [];
+    let currentFilter = 'all';
+    
+    // Dynamische Haushalts-Verwaltung aus LocalStorage laden
+    let households = JSON.parse(localStorage.getItem('freshpantry_households')) || ['Mein Zuhause', 'Zuhause Freundin'];
+    let currentHousehold = localStorage.getItem('freshpantry_current_household') || households[0];
+
+    let currentImageData = '';
+    let lastDeletedItem = null;
+    let toastTimeout = null;
+
+    // Helper functions
+    function getRelativeDateStr(days) {
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      return d.toISOString().split('T')[0];
+    }
+
+    function calculateDaysLeft(expiryStr) {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const exp = new Date(expiryStr);
+      exp.setHours(0,0,0,0);
+      return Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
+    }
+
+    function calculateDaysSince(dateStr) {
+      if (!dateStr) return 0;
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const past = new Date(dateStr);
+      past.setHours(0,0,0,0);
+      return Math.max(0, Math.floor((today - past) / (1000 * 60 * 60 * 24)));
+    }
+
+    // UI-Dropdown für Haushalte aktualisieren
+    function renderHouseholdSelect() {
+      const select = document.getElementById('householdSelect');
+      select.innerHTML = '';
+      households.forEach(h => {
+        const opt = document.createElement('option');
+        opt.value = h;
+        opt.textContent = h;
+        if (h === currentHousehold) opt.selected = true;
+        select.appendChild(opt);
+      });
+      localStorage.setItem('freshpantry_households', JSON.stringify(households));
+      localStorage.setItem('freshpantry_current_household', currentHousehold);
+    }
+
+    renderHouseholdSelect();
+
+    // Haushalt hinzufügen
+    document.getElementById('addHouseholdBtn').addEventListener('click', () => {
+      const name = prompt('Wie soll der neue Ort heißen? (z.B. Büro, Ferienwohnung)');
+      if (name && name.trim()) {
+        const cleanName = name.trim();
+        if (!households.includes(cleanName)) {
+          households.push(cleanName);
+          currentHousehold = cleanName;
+          renderHouseholdSelect();
+          renderItems();
+        } else {
+          alert('Dieser Ort existiert bereits.');
+        }
+      }
+    });
+
+    // Haushalt löschen
+    document.getElementById('deleteHouseholdBtn').addEventListener('click', () => {
+      if (households.length <= 1) {
+        alert('Du musst mindestens einen Ort behalten.');
+        return;
+      }
+      if (confirm(`Möchtest du den Ort "${currentHousehold}" wirklich löschen?`)) {
+        households = households.filter(h => h !== currentHousehold);
+        currentHousehold = households[0];
+        renderHouseholdSelect();
+        renderItems();
+      }
+    });
+
+    // Modal Control
+    function openModal() {
+      document.getElementById('itemName').value = '';
+      document.getElementById('itemExpiry').value = getRelativeDateStr(7);
+      document.getElementById('itemImage').value = '';
+      document.getElementById('photoPreview').classList.add('hidden');
+      document.getElementById('photoIcon').classList.remove('hidden');
+      document.getElementById('modalHouseholdText').textContent = currentHousehold;
+      currentImageData = '';
+      document.getElementById('itemModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('itemModal').classList.add('hidden');
+    }
+
+    document.getElementById('openModalBtn').addEventListener('click', openModal);
+    document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+    document.getElementById('cancelModalBtn').addEventListener('click', closeModal);
+
+    // Household Selection Change
+    document.getElementById('householdSelect').addEventListener('change', (e) => {
+      currentHousehold = e.target.value;
+      localStorage.setItem('freshpantry_current_household', currentHousehold);
+      renderItems();
+    });
+
+    // Image Compression Handler
+    document.getElementById('itemImage').addEventListener('change', function(e) {
+      const input = e.target;
+      if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = function(evt) {
+          const img = new Image();
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            const maxDim = 500;
+
+            if (width > height && width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            currentImageData = canvas.toDataURL('image/jpeg', 0.6);
+
+            const preview = document.getElementById('photoPreview');
+            preview.src = currentImageData;
+            preview.classList.remove('hidden');
+            document.getElementById('photoIcon').classList.add('hidden');
+          };
+          img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Firestore Actions
+    document.getElementById('saveItemBtn').addEventListener('click', async () => {
+      const name = document.getElementById('itemName').value.trim();
+      const expiry = document.getElementById('itemExpiry').value;
+      const location = document.getElementById('itemLocation').value;
+
+      if (!name || !expiry) {
+        alert('Bitte Name und Ablaufdatum angeben.');
+        return;
+      }
+
+      await addDoc(pantryRef, {
+        name,
+        expiry,
+        location,
+        household: currentHousehold,
+        image: currentImageData || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&auto=format&fit=crop&q=60',
+        fill: 100,
+        openedAt: null,
+        createdAt: new Date()
+      });
+
+      closeModal();
+    });
+
+    async function setFill(id, percent) {
+      const item = items.find(i => i.id === id);
+      if (!item) return;
+
+      let openedAt = item.openedAt;
+      if (percent < 100 && !openedAt) {
+        openedAt = new Date().toISOString().split('T')[0];
+      } else if (percent === 100) {
+        openedAt = null;
+      }
+
+      await updateDoc(doc(db, "pantry", id), { fill: percent, openedAt });
+    }
+
+    async function deleteItem(id, name) {
+      const item = items.find(i => i.id === id);
+      if (item) {
+        lastDeletedItem = { ...item };
+        await deleteDoc(doc(db, "pantry", id));
+        showUndoToast(name || item.name);
+      }
+    }
+
+    function showUndoToast(itemName) {
+      const toast = document.getElementById('undoToast');
+      document.getElementById('toastText').textContent = `"${itemName}" verbraucht`;
+      toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        hideUndoToast();
+      }, 4000);
+    }
+
+    function hideUndoToast() {
+      const toast = document.getElementById('undoToast');
+      toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+    }
+
+    document.getElementById('undoBtn').addEventListener('click', async () => {
+      if (lastDeletedItem) {
+        const { id, ...data } = lastDeletedItem;
+        await addDoc(pantryRef, data);
+        lastDeletedItem = null;
+        hideUndoToast();
+      }
+    });
+
+    // Filtering & Sorting UI handlers
+    function setFilter(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('[id^="tab-"]').forEach(btn => {
+        btn.className = 'px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 text-slate-300 border border-slate-800 whitespace-nowrap transition-all flex items-center gap-1';
+      });
+      const activeBtn = document.getElementById(`tab-${filter}`);
+      if (activeBtn) {
+        activeBtn.className = 'px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-cyan-500 text-slate-950 shadow-md whitespace-nowrap transition-all flex items-center gap-1';
+      }
+      renderItems();
+    }
+
+    ['all', 'expiring', 'opened', 'Kühlschrank', 'Schrank', 'Gefrierfach'].forEach(filterKey => {
+      document.getElementById(`tab-${filterKey}`).addEventListener('click', () => setFilter(filterKey));
+    });
+
+    document.getElementById('sortSelect').addEventListener('change', () => renderItems());
+
+    // Render Function
+    function renderItems() {
+      const list = document.getElementById('itemList');
+      const sortVal = document.getElementById('sortSelect').value;
+      list.innerHTML = '';
+
+      let filtered = items.filter(item => {
+        const itemHousehold = item.household || households[0];
+        if (itemHousehold !== currentHousehold) return false;
+
+        if (currentFilter === 'expiring') return calculateDaysLeft(item.expiry) <= 3;
+        if (currentFilter === 'opened') return !!item.openedAt;
+        if (currentFilter !== 'all') return item.location === currentFilter;
+        return true;
+      });
+
+      filtered.sort((a, b) => {
+        if (sortVal === 'expiry') return new Date(a.expiry) - new Date(b.expiry);
+        if (sortVal === 'opened') {
+          if (!a.openedAt) return 1;
+          if (!b.openedAt) return -1;
+          return new Date(a.openedAt) - new Date(b.openedAt);
+        }
+        if (sortVal === 'name') return a.name.localeCompare(b.name);
+        if (sortVal === 'fill') return a.fill - b.fill;
+        return 0;
+      });
+
+      const householdItems = items.filter(i => (i.household || households[0]) === currentHousehold);
+      const expiringCount = householdItems.filter(i => calculateDaysLeft(i.expiry) <= 3).length;
+      document.getElementById('sub-counter').textContent = `${householdItems.length} Produkte (${expiringCount} bald ablaufend)`;
+
+      if (filtered.length === 0) {
+        list.innerHTML = `
+          <div class="flex flex-col items-center justify-center py-16 text-center space-y-2">
+            <div class="w-14 h-14 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 text-xl">
+              <i class="fa-solid fa-basket-shopping"></i>
+            </div>
+            <p class="font-bold text-slate-300 text-xs">Keine Vorräte für diesen Ort / Kategorie</p>
+          </div>
+        `;
+        return;
+      }
+
+      filtered.forEach(item => {
+        const daysLeft = calculateDaysLeft(item.expiry);
+        let badgeStyle = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30';
+        let badgeText = `${daysLeft} Tage`;
+
+        if (daysLeft < 0) {
+          badgeStyle = 'bg-rose-500/20 text-rose-400 border-rose-500/40';
+          badgeText = `Abgelaufen (${Math.abs(daysLeft)}T)`;
+        } else if (daysLeft <= 3) {
+          badgeStyle = 'bg-amber-500/20 text-amber-400 border-amber-500/40 animate-pulse';
+          badgeText = daysLeft === 0 ? 'Heute ablaufend!' : `Nur noch ${daysLeft}T`;
+        }
+
+        let openedBadge = '';
+        if (item.openedAt) {
+          const daysOpened = calculateDaysSince(item.openedAt);
+          const txt = daysOpened === 0 ? 'Geöffnet: Heute' : `Geöffnet vor ${daysOpened} ${daysOpened === 1 ? 'Tag' : 'Tagen'}`;
+          openedBadge = `
+            <div class="text-[10px] text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 px-2 py-0.5 rounded-md inline-flex items-center gap-1 mt-1">
+              <i class="fa-solid fa-box-open text-[9px] text-indigo-400"></i>
+              <span>${txt}</span>
+            </div>
+          `;
+        }
+
+        const formattedDate = new Date(item.expiry).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'swipe-container';
+
+        wrapper.innerHTML = `
+          <div class="swipe-bg-delete">
+            <div class="flex items-center gap-2"><i class="fa-solid fa-trash-can"></i><span>Aufgeessen!</span></div>
+            <div class="flex items-center gap-2"><span>Aufgeessen!</span><i class="fa-solid fa-trash-can"></i></div>
+          </div>
+          <div class="swipe-card border border-slate-800 rounded-2xl p-3 flex gap-3 relative overflow-hidden">
+            <img src="${item.image}" class="w-16 h-16 rounded-xl object-cover bg-slate-950 border border-slate-800 shrink-0">
+            <div class="flex-1 min-w-0 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between">
+                  <h4 class="font-bold text-xs text-slate-100 truncate pr-2">${item.name}</h4>
+                  <button class="delete-btn-action text-slate-600 hover:text-rose-400 text-xs px-1">
+                    <i class="fa-regular fa-trash-can"></i>
+                  </button>
+                </div>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <span class="px-2 py-0.5 rounded-full text-[9px] font-bold border ${badgeStyle}">${badgeText}</span>
+                  <span class="text-[10px] text-slate-400">MHD: ${formattedDate}</span>
+                </div>
+                ${openedBadge}
+              </div>
+              <div class="mt-2">
+                <div class="grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                  ${[100, 75, 50, 25].map(p => `
+                    <button data-fill="${p}" class="fill-btn text-[9px] font-bold py-0.5 rounded transition-all ${item.fill === p ? 'bg-cyan-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}">${p}%</button>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        wrapper.querySelector('.delete-btn-action').addEventListener('click', () => deleteItem(item.id, item.name));
+        wrapper.querySelectorAll('.fill-btn').forEach(btn => {
+          btn.addEventListener('click', () => setFill(item.id, parseInt(btn.getAttribute('data-fill'))));
+        });
+
+        attachSwipe(wrapper.querySelector('.swipe-card'), item.id, item.name);
+        list.appendChild(wrapper);
+      });
+    }
+
+    // Touch Swipe-to-Delete Implementation
+    function attachSwipe(cardEl, id, name) {
+      let startX = 0;
+      let currentX = 0;
+      let isSwiping = false;
+
+      const onStart = (e) => {
+        startX = e.touches ? e.touches[0].clientX : e.clientX;
+        isSwiping = true;
+        cardEl.classList.add('swiping');
+      };
+
+      const onMove = (e) => {
+        if (!isSwiping) return;
+        const x = e.touches ? e.touches[0].clientX : e.clientX;
+        currentX = x - startX;
+        cardEl.style.transform = `translateX(${currentX}px)`;
+      };
+
+      const onEnd = () => {
+        if (!isSwiping) return;
+        isSwiping = false;
+        cardEl.classList.remove('swiping');
+
+        if (Math.abs(currentX) > 100) {
+          const dir = currentX > 0 ? 1 : -1;
+          cardEl.style.transition = 'transform 0.25s ease-out';
+          cardEl.style.transform = `translateX(${dir * 500}px)`;
+          setTimeout(() => deleteItem(id, name), 200);
+        } else {
+          cardEl.style.transition = 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)';
+          cardEl.style.transform = 'translateX(0px)';
+        }
+        currentX = 0;
+      };
+
+      cardEl.addEventListener('touchstart', onStart, { passive: true });
+      cardEl.addEventListener('touchmove', onMove, { passive: true });
+      cardEl.addEventListener('touchend', onEnd);
+    }
+
+    // Realtime Listener to Sync with Firebase
+    onSnapshot(pantryRef, (snapshot) => {
+      items = [];
+      snapshot.forEach((docSnap) => {
+        items.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      renderItems();
+    });
+
+    // Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+      const swCode = `self.addEventListener('fetch', function(e) {});`;
+      const blob = new Blob([swCode], {type: 'application/javascript'});
+      navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+    }
+  </script>
+</body>
+</html>
